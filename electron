@@ -10,6 +10,7 @@
 '''Script to kick off the client.'''
 
 import logging
+import sys
 import traceback
 
 from client.app import App
@@ -22,13 +23,15 @@ def main():
 
     try:
         app = App()
-        app.run()
+        status = app.run()
+        logging.info(f'{App.NAME} terminated normally '
+                     f'with status code {status}')
     except Exception:
         traceback.print_exc()
         logging.critical(f'{App.NAME} terminated abnormally')
-    else:
-        logging.info(f'{App.NAME} terminated normally')
+        status = 1
 
+    sys.exit(status)
 
 if __name__ == '__main__':
     main()
