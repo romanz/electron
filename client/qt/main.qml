@@ -13,8 +13,7 @@ ApplicationWindow {
     title: "Electron Cash"
     width: 640
     height: 480
-    color: "#00000000"
-    opacity: 1
+    color: "#ffffff"
     visible: true
 
     menuBar: MenuBar {
