@@ -8,12 +8,14 @@
 '''Logic for BIP32 Hierarchical Key Derviation.'''
 
 import struct
+from collections import namedtuple
 
 import ecdsa
 import ecdsa.ellipticcurve as EC
 import ecdsa.numbertheory as NT
 
 from lib.hash import Base58, hmac_sha512, hash160
+from lib.keys import PublicKeyBase
 from lib.util import cachedproperty, bytes_to_int, int_to_bytes
 
 
@@ -84,7 +86,7 @@ class _KeyBase(object):
         return Base58.encode_check(self.extended_key(ver_bytes))
 
 
-class PubKey(_KeyBase):
+class MasterPubKey(_KeyBase):
     '''A BIP32 public key.'''
 
     def __init__(self, pubkey, chain_code, n, depth, pfingerprint=bytes(4)):
@@ -150,7 +152,7 @@ class PubKey(_KeyBase):
 
         verkey = ecdsa.VerifyingKey.from_public_point(point, curve=curve)
 
-        return PubKey(verkey, R, n, self.depth + 1, self.fingerprint())
+        return MasterPubKey(verkey, R, n, self.depth + 1, self.fingerprint())
 
     def address(self, ver_byte):
         "The public key as a P2PKH address"
@@ -166,7 +168,7 @@ class PubKey(_KeyBase):
         return self._extended_key(ver_bytes, self.pubkey_bytes)
 
 
-class PrivKey(_KeyBase):
+class MasterPrivKey(_KeyBase):
     '''A BIP32 private key.'''
 
     HARDENED = 1 << 31
@@ -214,8 +216,8 @@ class PrivKey(_KeyBase):
     def public_key(self):
         '''Return the corresponding extended public key.'''
         verifying_key = self.signing_key.get_verifying_key()
-        return PubKey(verifying_key, self.chain_code, self.n, self.depth,
-                      self.parent_fingerprint)
+        return MasterPubKey(verifying_key, self.chain_code, self.n, self.depth,
+                            self.parent_fingerprint)
 
     def ec_point(self):
         return self.public_key.ec_point()
@@ -245,7 +247,7 @@ class PrivKey(_KeyBase):
 
         privkey = _exponent_to_bytes(exponent)
 
-        return PrivKey(privkey, R, n, self.depth + 1, self.fingerprint())
+        return MasterPrivKey(privkey, R, n, self.depth + 1, self.fingerprint())
 
     def address(self, coin):
         "The public key as a P2PKH address"
@@ -261,7 +263,7 @@ class PrivKey(_KeyBase):
 
 
 class BIP32PublicKey(PublicKeyBase, namedtuple("BIP32PublicKeyTuple",
-                                               "pubkey n"))
+                                               "pubkey n")):
     '''BIP32 public key.  Embeds its child index.'''
 
     @classmethod
@@ -277,22 +279,22 @@ def _exponent_to_bytes(exponent):
     return (bytes(32) + int_to_bytes(exponent))[-32:]
 
 def _from_extended_key(ekey):
-    '''Return a PubKey or PrivKey from an extended key raw bytes.'''
+    '''Return a MasterPubKey or MasterPrivKey from an extended key raw bytes.'''
     if not isinstance(ekey, (bytes, bytearray)):
         raise TypeError('extended key must be raw bytes')
     if len(ekey) != 78:
         raise ValueError('extended key must have length 78')
 
     depth = ekey[4]
-    parent_fingerprint = ekey[5:9]
+    pfingerprint = ekey[5:9]
     n, = struct.unpack('>I', ekey[9:13])
     chain_code = ekey[13:45]
 
     if ekey[45]:
-        # PubKey - its constructor asserts the initial byte is 2 or 3
-        return PubKey(ekey[45:], chain_code, n, depth, parent_fingerprint)
+        # A public key - constructor asserts the initial byte is 2 or 3
+        return MasterPubKey(ekey[45:], chain_code, n, depth, pfingerprint)
     else:
-        return PrivKey(ekey[46:], chain_code, n, depth, parent_fingerprint)
+        return MasterPrivKey(ekey[46:], chain_code, n, depth, pfingerprint)
 
 
 def from_extended_key_string(ekey_str):
@@ -301,8 +303,8 @@ def from_extended_key_string(ekey_str):
     xpub6BsnM1W2Y7qLMiuhi7f7dbAwQZ5Cz5gYJCRzTNainXzQXYjFwtuQXHd
     3qfi3t3KJtHxshXezfjft93w4UE7BGMtKwhqEHae3ZA7d823DVrL
 
-    return a (key, verbytes) pair.   key is either a PubKey or PrivKey.
-    verbytes is a bytes object of length 4.
+    return a (key, verbytes) pair.   key is either a MasterPubKey or
+    MasterPrivKey.  verbytes is a bytes object of length 4.
 
     Caller might want to select coin based on the version bytes, and
     check public or private as appropriate.  Sadly version bytes are

@@ -7,6 +7,7 @@
 
 
 from lib.util import to_bytes, hex_to_bytes, cachedproperty
+from collections import namedtuple
 
 
 class KeyError(Exception):
