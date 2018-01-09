@@ -260,6 +260,18 @@ class PrivKey(_KeyBase):
         return self._extended_key(ver_bytes, b'\0' + self.privkey_bytes)
 
 
+class BIP32PublicKey(PublicKeyBase, namedtuple("BIP32PublicKeyTuple",
+                                               "pubkey n"))
+    '''BIP32 public key.  Embeds its child index.'''
+
+    @classmethod
+    def from_bytes(cls, pubkey, n):
+        return cls(cls._validate_bytes(pubkey), n)
+
+    def __repr__(self):
+        return f'<BIP32PublicKey {self}/{self.n}>'
+
+
 def _exponent_to_bytes(exponent):
     '''Convert an exponent to 32 big-endian bytes'''
     return (bytes(32) + int_to_bytes(exponent))[-32:]

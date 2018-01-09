@@ -93,6 +93,13 @@ def chunks(items, size):
     for i in range(0, len(items), size):
         yield items[i: i + size]
 
+def to_bytes(x):
+    '''Convert to bytes which is hashable.'''
+    if isinstance(x, bytes):
+        return x
+    if isinstance(x, (bytearray, memoryview)):
+        return bytes(x)
+    raise TypeError(f'binary bytes required, not {x} ({type(x)})')
 
 def bytes_to_int(be_bytes):
     '''Interprets a big-endian sequence of bytes as an integer'''
