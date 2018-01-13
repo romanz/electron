@@ -122,19 +122,23 @@ class MasterPubKey(_KeyBase):
 
         return ecdsa.VerifyingKey.from_public_point(point, curve=cls.CURVE)
 
-    @cachedproperty
-    def pubkey_bytes(self):
-        '''Return the compressed public key as 33 bytes.'''
-        point = self.verifying_key.pubkey.point
+    @classmethod
+    def compressed_pubkey(cls, verifying_key):
+        '''Return the compressed public key from a verifying key as 33 bytes.'''
+        point = verifying_key.pubkey.point
         prefix = bytes([2 + (point.y() & 1)])
         padded_bytes = _exponent_to_bytes(point.x())
         return prefix + padded_bytes
 
+    @cachedproperty
+    def pubkey_bytes(self):
+        '''Return the compressed public key as 33 bytes.'''
+        return self.compressed_pubkey(self.verifying_key)
+
     def ec_point(self):
         return self.verifying_key.pubkey.point
 
-    def child(self, n):
-        '''Return the derived child extended pubkey at index N.'''
+    def child_verkey_R(self, n):
         if not 0 <= n < (1 << 31):
             raise ValueError('invalid BIP32 public key child number')
 
@@ -150,9 +154,17 @@ class MasterPubKey(_KeyBase):
         if point == EC.INFINITY:
             raise DerivationError
 
-        verkey = ecdsa.VerifyingKey.from_public_point(point, curve=curve)
+        return ecdsa.VerifyingKey.from_public_point(point, curve=curve), R
 
+    def child(self, n):
+        '''Return the derived child extended pubkey at index N.'''
+        verkey, R = self.child_verkey_R(n)
         return MasterPubKey(verkey, R, n, self.depth + 1, self.fingerprint())
+
+    def child_compressed_pubkey(self, n):
+        '''Return the derived child extended pubkey at index N.'''
+        verkey, R = self.child_verkey_R(n)
+        return self.compressed_pubkey(verkey)
 
     def address(self, ver_byte):
         "The public key as a P2PKH address"
@@ -260,18 +272,6 @@ class MasterPrivKey(_KeyBase):
     def extended_key(self, ver_bytes):
         '''Return a raw extended private key.'''
         return self._extended_key(ver_bytes, b'\0' + self.privkey_bytes)
-
-
-class BIP32PublicKey(PublicKeyBase, namedtuple("BIP32PublicKeyTuple",
-                                               "pubkey n")):
-    '''BIP32 public key.  Embeds its child index.'''
-
-    @classmethod
-    def from_bytes(cls, pubkey, n):
-        return cls(cls._validate_bytes(pubkey), n)
-
-    def __repr__(self):
-        return f'<BIP32PublicKey {self}/{self.n}>'
 
 
 def _exponent_to_bytes(exponent):
