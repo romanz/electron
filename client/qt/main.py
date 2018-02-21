@@ -25,7 +25,7 @@ class QtGUI(object):
         self.qt_app = QGuiApplication(sys.argv)
 
     def relative_path(self, path):
-        return os.path.join(os.path.dirname(__file__), 'main.qml')
+        return os.path.join(os.path.dirname(__file__), path)
 
     def run(self):
         engine = QQmlApplicationEngine()
